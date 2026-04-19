@@ -1,24 +1,24 @@
 {
   "name": "bustrack",
-  "version": "2.0.0",
-  "description": "Resilient college bus tracking system",
+  "version": "3.0.0",
+  "description": "Resilient Public Transport Tracking System",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "setup-tunnel": "npm install @ngrok/ngrok"
+    "build": "npm rebuild better-sqlite3"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "express": "^4.18.2",
     "socket.io": "^4.8.3",
     "better-sqlite3": "^9.4.3",
     "bcryptjs": "^2.4.3"
-  },
-  "optionalDependencies": {
-    "@ngrok/ngrok": "^1.4.0"
   }
 }
