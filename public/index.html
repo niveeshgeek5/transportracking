@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BusTrack — Resilient Public Transport Tracking</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;700;900&family=Bebas+Neue&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #04080f;
+      --surface: #0b1220;
+      --surface2: #0f1929;
+      --border: #162035;
+      --accent: #00d4ff;
+      --accent2: #ff5c35;
+      --green: #00e87a;
+      --text: #dde8f5;
+      --muted: #3d5070;
+      --muted2: #5a7090;
+    }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      animation: gridMove 20s linear infinite;
+      pointer-events: none;
+    }
+    @keyframes gridMove {
+      0% { background-position: 0 0; }
+      100% { background-position: 48px 48px; }
+    }
+
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      pointer-events: none;
+    }
+    .orb1 { width: 550px; height: 550px; background: rgba(0,212,255,0.12); top: -220px; right: -120px; animation: orbFloat1 8s ease-in-out infinite; }
+    .orb2 { width: 450px; height: 450px; background: rgba(255,92,53,0.10); bottom: -180px; left: -120px; animation: orbFloat2 10s ease-in-out infinite; }
+    .orb3 { width: 300px; height: 300px; background: rgba(0,232,122,0.07); top: 40%; left: 50%; transform: translate(-50%,-50%); animation: orbFloat1 12s ease-in-out infinite reverse; }
+    @keyframes orbFloat1 { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-30px)} }
+    @keyframes orbFloat2 { 0%,100%{transform:translateY(0)} 50%{transform:translateY(20px)} }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 480px;
+      padding: 24px 20px;
+    }
+
+    .brand { text-align: center; margin-bottom: 36px; }
+
+    .bus-icon-wrap {
+      position: relative;
+      display: inline-block;
+      margin-bottom: 14px;
+    }
+    .bus-icon {
+      font-size: 3.2rem;
+      display: block;
+      animation: busFloat 3.5s ease-in-out infinite;
+      filter: drop-shadow(0 0 20px rgba(0,212,255,0.5));
+    }
+    @keyframes busFloat {
+      0%,100% { transform: translateY(0) rotate(-2deg); }
+      50% { transform: translateY(-10px) rotate(2deg); }
+    }
+    .radar-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(0,212,255,0.3);
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      animation: radarPulse 2.5s ease-out infinite;
+    }
+    .radar-ring:nth-child(2) { animation-delay: 0.8s; }
+    .radar-ring:nth-child(3) { animation-delay: 1.6s; }
+    @keyframes radarPulse {
+      0% { width: 40px; height: 40px; opacity: 0.8; }
+      100% { width: 120px; height: 120px; opacity: 0; }
+    }
+
+    .brand-name {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 3.6rem;
+      letter-spacing: 4px;
+      background: linear-gradient(135deg, var(--accent) 0%, #7af8ff 50%, var(--green) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1;
+      margin-bottom: 10px;
+    }
+
+    .project-tagline-text {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: rgba(0,212,255,0.07);
+      border: 1px solid rgba(0,212,255,0.22);
+      padding: 7px 14px 7px 10px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tag-icon {
+      width: 20px; height: 20px;
+      background: rgba(0,212,255,0.15);
+      border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem;
+      flex-shrink: 0;
+    }
+
+    .live-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0,232,122,0.08);
+      border: 1px solid rgba(0,232,122,0.2);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.6rem;
+      color: var(--green);
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    .live-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: livePulse 1.4s infinite;
+    }
+    @keyframes livePulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.3;transform:scale(0.5)} }
+
+    .stats-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .stat-chip {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 10px;
+      text-align: center;
+    }
+    .stat-val {
+      font-size: 1.3rem;
+      font-weight: 900;
+      color: var(--accent);
+      font-family: 'Bebas Neue', sans-serif;
+      letter-spacing: 1px;
+      line-height: 1;
+    }
+    .stat-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.52rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 3px;
+    }
+    .stat-chip:nth-child(2) .stat-val { color: var(--accent2); }
+    .stat-chip:nth-child(3) .stat-val { color: var(--green); }
+
+    .role-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .role-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 30px 20px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      text-decoration: none;
+      color: inherit;
+      display: block;
+      position: relative;
+      overflow: hidden;
+    }
+    .role-card::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 40px; height: 40px;
+      border-top: 2px solid transparent;
+      border-left: 2px solid transparent;
+      border-radius: 22px 0 0 0;
+      transition: 0.3s;
+    }
+    .role-card.driver::after { border-color: var(--accent); }
+    .role-card.tracker::after { border-color: var(--accent2); }
+
+    .role-card-glow {
+      position: absolute;
+      inset: 0;
+      border-radius: 22px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .role-card.driver .role-card-glow { background: radial-gradient(circle at 50% -20%, rgba(0,212,255,0.12), transparent 65%); }
+    .role-card.tracker .role-card-glow { background: radial-gradient(circle at 50% -20%, rgba(255,92,53,0.12), transparent 65%); }
+
+    .role-card:hover { transform: translateY(-5px); }
+    .role-card:hover .role-card-glow { opacity: 1; }
+    .role-card.driver:hover { border-color: rgba(0,212,255,0.5); box-shadow: 0 16px 48px rgba(0,212,255,0.12); }
+    .role-card.tracker:hover { border-color: rgba(255,92,53,0.5); box-shadow: 0 16px 48px rgba(255,92,53,0.12); }
+
+    .role-emoji { font-size: 2.6rem; display: block; margin-bottom: 14px; transition: transform 0.3s; position: relative; z-index: 1; }
+    .role-card:hover .role-emoji { transform: scale(1.15); }
+
+    .role-title {
+      font-size: 1.1rem; font-weight: 900; margin-bottom: 7px;
+      position: relative; z-index: 1;
+    }
+    .role-card.driver .role-title { color: var(--accent); }
+    .role-card.tracker .role-title { color: var(--accent2); }
+
+    .role-desc {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.62rem; color: var(--muted2); line-height: 1.6;
+      position: relative; z-index: 1;
+    }
+    .role-arrow {
+      display: inline-flex; align-items: center; justify-content: center;
+      margin-top: 14px; width: 32px; height: 32px;
+      border-radius: 50%; background: var(--surface2); border: 1px solid var(--border);
+      font-size: 0.8rem; transition: 0.3s; position: relative; z-index: 1;
+    }
+    .role-card.driver:hover .role-arrow { background: rgba(0,212,255,0.15); border-color: var(--accent); color: var(--accent); }
+    .role-card.tracker:hover .role-arrow { background: rgba(255,92,53,0.15); border-color: var(--accent2); color: var(--accent2); }
+
+    .footer-note {
+      text-align: center;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.6rem; color: var(--muted);
+      padding-top: 16px; border-top: 1px solid var(--border); line-height: 1.8;
+    }
+    .footer-note strong { color: var(--muted2); }
+  </style>
+</head>
+<body>
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+
+  <div class="container">
+    <div class="brand">
+      <div class="bus-icon-wrap">
+        <div class="radar-ring"></div>
+        <div class="radar-ring"></div>
+        <div class="radar-ring"></div>
+        <span class="bus-icon">🚌</span>
+      </div>
+      <div class="live-pill">
+        <div class="live-dot"></div>
+        GPS LIVE TRACKING
+      </div>
+      <div class="brand-name">BusTrack</div>
+      <div class="project-tagline-text">
+        <div class="tag-icon">⚡</div>
+        Resilient Public Transport Tracking System
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-chip">
+        <div class="stat-val">GPS</div>
+        <div class="stat-label">Real-time</div>
+      </div>
+      <div class="stat-chip">
+        <div class="stat-val">2</div>
+        <div class="stat-label">Roles</div>
+      </div>
+      <div class="stat-chip">
+        <div class="stat-val">PWA</div>
+        <div class="stat-label">Offline-ready</div>
+      </div>
+    </div>
+
+    <div class="role-grid">
+      <a href="driver.html" class="role-card driver">
+        <div class="role-card-glow"></div>
+        <span class="role-emoji">🧑‍✈️</span>
+        <div class="role-title">Driver</div>
+        <div class="role-desc">Broadcast live GPS location to your route</div>
+        <div class="role-arrow">→</div>
+      </a>
+      <a href="tracker.html" class="role-card tracker">
+        <div class="role-card-glow"></div>
+        <span class="role-emoji">📡</span>
+        <div class="role-title">Tracker</div>
+        <div class="role-desc">Track your bus live with route line & ETA</div>
+        <div class="role-arrow">→</div>
+      </a>
+    </div>
+
+    <div class="footer-note">
+      Drivers use <strong>personal login</strong> · Trackers use the <strong>route password</strong>
+    </div>
+  </div>
+</body>
+</html>

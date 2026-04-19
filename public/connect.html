@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Connect — BusTrack</title>
+  <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #06090f;
+      --surface: #0d1420;
+      --surface2: #111827;
+      --border: #1a2540;
+      --accent: #00e5ff;
+      --accent2: #ff6b35;
+      --green: #00ff88;
+      --red: #ff4757;
+      --yellow: #ffd32a;
+      --text: #e2e8f0;
+      --muted: #4a5568;
+    }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'Syne', sans-serif;
+      min-height: 100vh; padding: 20px;
+      position: relative;
+    }
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,229,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,255,0.025) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+    .topbar {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 28px; position: relative; z-index: 1;
+    }
+    .back-btn {
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--muted); padding: 8px 14px; border-radius: 10px;
+      cursor: pointer; font-family: 'Space Mono', monospace; font-size: 0.75rem;
+      text-decoration: none; transition: 0.2s;
+    }
+    .back-btn:hover { color: var(--accent); border-color: var(--accent); }
+    .page-title { font-size: 1.3rem; font-weight: 800; color: var(--accent); }
+
+    .content {
+      max-width: 480px; margin: 0 auto;
+      position: relative; z-index: 1;
+    }
+
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; padding: 24px; margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 0.7rem; font-family: 'Space Mono', monospace;
+      letter-spacing: 3px; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 16px;
+    }
+
+    /* ── STATUS PILL ── */
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 16px; border-radius: 20px;
+      font-family: 'Space Mono', monospace; font-size: 0.75rem;
+      margin-bottom: 20px;
+    }
+    .status-pill.online {
+      background: rgba(0,255,136,0.08); border: 1px solid rgba(0,255,136,0.3); color: var(--green);
+    }
+    .status-pill.local {
+      background: rgba(255,211,42,0.08); border: 1px solid rgba(255,211,42,0.3); color: var(--yellow);
+    }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+    .status-pill.online .status-dot { animation: pulse 1.2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* ── URL DISPLAY ── */
+    .url-box {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 14px; padding: 14px 16px;
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 12px; cursor: pointer;
+      transition: 0.2s;
+    }
+    .url-box:hover { border-color: var(--accent); }
+    .url-text {
+      flex: 1; font-family: 'Space Mono', monospace; font-size: 0.75rem;
+      color: var(--accent); word-break: break-all; line-height: 1.5;
+    }
+    .copy-btn {
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--muted); padding: 6px 12px; border-radius: 8px;
+      font-family: 'Space Mono', monospace; font-size: 0.65rem;
+      cursor: pointer; flex-shrink: 0; transition: 0.2s;
+      white-space: nowrap;
+    }
+    .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+    .copy-btn.copied { color: var(--green); border-color: var(--green); }
+
+    /* ── QR ── */
+    .qr-wrap {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 10px; margin: 16px 0;
+    }
+    .qr-wrap canvas {
+      border-radius: 14px; padding: 12px;
+      background: white;
+    }
+    .qr-label {
+      font-family: 'Space Mono', monospace; font-size: 0.65rem;
+      color: var(--muted); text-align: center;
+    }
+
+    /* ── SETUP GUIDE ── */
+    .setup-step {
+      display: flex; gap: 14px; align-items: flex-start;
+      margin-bottom: 16px;
+    }
+    .step-num {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--surface2); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Space Mono', monospace; font-size: 0.75rem;
+      color: var(--accent); flex-shrink: 0;
+    }
+    .step-body { flex: 1; }
+    .step-title { font-size: 0.9rem; font-weight: 700; margin-bottom: 4px; }
+    .step-desc {
+      font-family: 'Space Mono', monospace; font-size: 0.65rem;
+      color: var(--muted); line-height: 1.7;
+    }
+    .code-block {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px 14px; margin-top: 8px;
+      font-family: 'Space Mono', monospace; font-size: 0.7rem;
+      color: var(--green); cursor: pointer; transition: 0.2s;
+      position: relative;
+    }
+    .code-block:hover { border-color: var(--green); }
+    .code-block .cmd-copy {
+      position: absolute; top: 8px; right: 10px;
+      font-size: 0.6rem; color: var(--muted);
+    }
+
+    /* ── PASSWORD EXPLAINER ── */
+    .pw-row {
+      display: flex; gap: 12px; margin-bottom: 12px;
+    }
+    .pw-box {
+      flex: 1; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 14px;
+      padding: 14px;
+    }
+    .pw-icon { font-size: 1.4rem; margin-bottom: 8px; display: block; }
+    .pw-title { font-size: 0.85rem; font-weight: 700; margin-bottom: 4px; }
+    .pw-box.driver-pw .pw-title { color: var(--accent); }
+    .pw-box.route-pw .pw-title { color: var(--accent2); }
+    .pw-desc {
+      font-family: 'Space Mono', monospace; font-size: 0.62rem;
+      color: var(--muted); line-height: 1.6;
+    }
+    .pw-who {
+      margin-top: 8px; padding: 4px 10px; border-radius: 20px;
+      font-family: 'Space Mono', monospace; font-size: 0.6rem;
+      display: inline-block;
+    }
+    .driver-pw .pw-who { background: rgba(0,229,255,0.08); color: var(--accent); }
+    .route-pw .pw-who  { background: rgba(255,107,53,0.08); color: var(--accent2); }
+
+    /* ── ACTIVE ROUTES ── */
+    .route-item {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 12px; padding: 12px 16px; margin-bottom: 8px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .route-name { font-size: 0.9rem; font-weight: 600; }
+    .route-id {
+      font-family: 'Space Mono', monospace; font-size: 0.65rem;
+      color: var(--accent); margin-top: 2px;
+    }
+    .route-copy {
+      background: none; border: 1px solid var(--border);
+      color: var(--muted); padding: 5px 12px; border-radius: 8px;
+      font-family: 'Space Mono', monospace; font-size: 0.6rem;
+      cursor: pointer; flex-shrink: 0; transition: 0.2s;
+    }
+    .route-copy:hover { color: var(--accent); border-color: var(--accent); }
+
+    .empty-routes {
+      font-family: 'Space Mono', monospace; font-size: 0.72rem;
+      color: var(--muted); text-align: center; padding: 16px;
+    }
+
+    .tab-link {
+      display: block; text-align: center;
+      font-family: 'Space Mono', monospace; font-size: 0.65rem;
+      color: var(--muted); margin-top: 8px; text-decoration: none;
+    }
+    .tab-link:hover { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <a href="/" class="back-btn">← Back</a>
+    <div class="page-title">🌐 Connect & Share</div>
+  </div>
+
+  <div class="content">
+
+    <!-- SERVER STATUS + URL -->
+    <div class="card">
+      <div class="card-title">Server Access</div>
+      <div id="statusPill" class="status-pill local">
+        <div class="status-dot"></div>
+        <span id="statusText">Checking...</span>
+      </div>
+
+      <div id="urlSection">
+        <div class="url-box" onclick="copyUrl('publicUrlText')">
+          <div class="url-text" id="publicUrlText">Loading...</div>
+          <button class="copy-btn" id="copyPublicBtn">Copy</button>
+        </div>
+
+        <div style="margin-bottom:8px;font-family:'Space Mono',monospace;font-size:0.65rem;color:var(--muted)">
+          Local WiFi URL (same network only):
+        </div>
+        <div class="url-box" onclick="copyUrl('localUrlText')">
+          <div class="url-text" id="localUrlText">Loading...</div>
+          <button class="copy-btn" id="copyLocalBtn">Copy</button>
+        </div>
+      </div>
+
+      <!-- QR for public URL -->
+      <div class="qr-wrap" id="qrWrap" style="display:none">
+        <canvas id="qrCanvas"></canvas>
+        <div class="qr-label">Scan this QR code to open BusTrack on any phone</div>
+      </div>
+    </div>
+
+    <!-- NGROK SETUP (shown if no public URL) -->
+    <div class="card" id="setupCard" style="display:none">
+      <div class="card-title">Enable Internet Access</div>
+      <p style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);margin-bottom:20px;line-height:1.7">
+        Right now your server is only reachable on your local WiFi.
+        Friends on different networks (mobile data, different WiFi) need a public URL.
+        Set up a free ngrok tunnel in 3 steps:
+      </p>
+
+      <div class="setup-step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Install ngrok package</div>
+          <div class="step-desc">In your project folder, run:</div>
+          <div class="code-block" onclick="copyCmd(this)">
+            npm install @ngrok/ngrok
+            <span class="cmd-copy">copy</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="setup-step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Get a free ngrok token</div>
+          <div class="step-desc">
+            Sign up free at <span style="color:var(--accent)">dashboard.ngrok.com</span>
+            → Your Authtoken → copy the token
+          </div>
+        </div>
+      </div>
+
+      <div class="setup-step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Start server with token</div>
+          <div class="step-desc">Replace YOUR_TOKEN and restart:</div>
+          <div class="code-block" onclick="copyCmd(this)">
+            NGROK_AUTHTOKEN=YOUR_TOKEN node server.js
+            <span class="cmd-copy">copy</span>
+          </div>
+          <div class="step-desc" style="margin-top:8px">
+            On Windows (PowerShell):
+          </div>
+          <div class="code-block" onclick="copyCmd(this)">
+            $env:NGROK_AUTHTOKEN="YOUR_TOKEN"; node server.js
+            <span class="cmd-copy">copy</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:rgba(0,229,255,0.05);border:1px solid rgba(0,229,255,0.15);border-radius:12px;padding:12px;font-family:'Space Mono',monospace;font-size:0.65rem;color:var(--muted);line-height:1.7">
+        💡 After restart, come back to this page — the public URL will appear automatically and you can share it with anyone.
+      </div>
+    </div>
+
+    <!-- PASSWORD EXPLAINER -->
+    <div class="card">
+      <div class="card-title">Password Guide</div>
+      <div class="pw-row">
+        <div class="pw-box driver-pw">
+          <span class="pw-icon">🔑</span>
+          <div class="pw-title">Driver Password</div>
+          <div class="pw-desc">Your personal login password. Only you know this. Used to log in to the driver panel.</div>
+          <span class="pw-who">🧑‍✈️ Drivers only</span>
+        </div>
+        <div class="pw-box route-pw">
+          <span class="pw-icon">🚌</span>
+          <div class="pw-title">Route Password</div>
+          <div class="pw-desc">Shared password for the whole route. Share this with commuters AND other drivers joining the same route.</div>
+          <span class="pw-who">👥 Everyone on route</span>
+        </div>
+      </div>
+      <p style="font-family:'Space Mono',monospace;font-size:0.65rem;color:var(--muted);line-height:1.7">
+        ⚠️ A second driver joining the same route needs: a unique username, their own personal password, and the <span style="color:var(--accent2)">same route ID + route password</span> as the first driver.
+      </p>
+    </div>
+
+    <!-- ACTIVE ROUTES -->
+    <div class="card">
+      <div class="card-title">Active Routes</div>
+      <div id="routesList"><p class="empty-routes">Loading routes...</p></div>
+      <a href="/driver.html" class="tab-link">+ Register a new route as driver →</a>
+    </div>
+
+  </div>
+
+  <script>
+    let serverInfo = null;
+
+    async function loadInfo() {
+      try {
+        const res = await fetch('/api/server-info');
+        serverInfo = await res.json();
+        renderStatus();
+        renderRoutes();
+      } catch(e) {
+        document.getElementById('statusText').textContent = 'Cannot reach server';
+      }
+    }
+
+    function renderStatus() {
+      const pill = document.getElementById('statusPill');
+      const txt  = document.getElementById('statusText');
+
+      if (serverInfo.hasPublicUrl) {
+        pill.className = 'status-pill online';
+        txt.textContent = 'Online — accessible from anywhere';
+
+        document.getElementById('publicUrlText').textContent = serverInfo.publicUrl;
+        document.getElementById('localUrlText').textContent  = serverInfo.localUrl;
+        document.getElementById('setupCard').style.display  = 'none';
+
+        // Generate QR
+        document.getElementById('qrWrap').style.display = 'flex';
+        QRCode.toCanvas(document.getElementById('qrCanvas'), serverInfo.publicUrl, {
+          width: 200, margin: 1,
+          color: { dark: '#000000', light: '#ffffff' }
+        });
+      } else {
+        pill.className = 'status-pill local';
+        txt.textContent = 'Local WiFi only — internet access not enabled';
+
+        document.getElementById('publicUrlText').textContent =
+          'No public URL yet — follow the setup guide below';
+        document.getElementById('localUrlText').textContent = serverInfo.localUrl;
+        document.getElementById('setupCard').style.display  = 'block';
+        document.getElementById('qrWrap').style.display     = 'none';
+
+        // QR for local URL at least
+        document.getElementById('qrWrap').style.display = 'flex';
+        QRCode.toCanvas(document.getElementById('qrCanvas'), serverInfo.localUrl, {
+          width: 180, margin: 1,
+          color: { dark: '#000000', light: '#ffffff' }
+        });
+        document.getElementById('qrWrap').querySelector('.qr-label').textContent =
+          'QR for local WiFi — only works on same network';
+      }
+    }
+
+    function renderRoutes() {
+      const list = document.getElementById('routesList');
+      if (!serverInfo.routes?.length) {
+        list.innerHTML = '<p class="empty-routes">No routes created yet</p>';
+        return;
+      }
+      list.innerHTML = serverInfo.routes.map(r => `
+        <div class="route-item">
+          <div>
+            <div class="route-name">${r.name}</div>
+            <div class="route-id"># ${r.route_id}</div>
+          </div>
+          <button class="route-copy" onclick="copyText('${r.route_id}', this)">Copy ID</button>
+        </div>
+      `).join('');
+    }
+
+    function copyUrl(elemId) {
+      const text = document.getElementById(elemId).textContent;
+      if (text.startsWith('No public') || text.startsWith('Loading')) return;
+      navigator.clipboard.writeText(text).then(() => {
+        const btnId = elemId === 'publicUrlText' ? 'copyPublicBtn' : 'copyLocalBtn';
+        const btn = document.getElementById(btnId);
+        const orig = btn.textContent;
+        btn.textContent = '✓ Copied';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1800);
+      });
+    }
+
+    function copyText(text, btn) {
+      navigator.clipboard.writeText(text).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = '✓ Copied';
+        setTimeout(() => { btn.textContent = orig; }, 1500);
+      });
+    }
+
+    function copyCmd(el) {
+      const text = el.childNodes[0].textContent.trim();
+      navigator.clipboard.writeText(text).then(() => {
+        const span = el.querySelector('.cmd-copy');
+        span.textContent = '✓ copied';
+        setTimeout(() => { span.textContent = 'copy'; }, 1500);
+      });
+    }
+
+    loadInfo();
+    // Refresh every 10s in case ngrok comes online
+    setInterval(loadInfo, 10000);
+  </script>
+</body>
+</html>

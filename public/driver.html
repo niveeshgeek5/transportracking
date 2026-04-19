@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Driver Panel — BusTrack</title>
+  <link rel="manifest" href="/manifest.json"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="theme-color" content="#04080f"/>
+  <script src="/socket.io/socket.io.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;700;900&family=Bebas+Neue&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #04080f;
+      --surface: #0b1220;
+      --surface2: #0f1929;
+      --border: #162035;
+      --accent: #00d4ff;
+      --green: #00e87a;
+      --red: #ff4757;
+      --yellow: #ffd32a;
+      --text: #dde8f5;
+      --muted: #3d5070;
+      --muted2: #5a7090;
+    }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      padding: 20px;
+      position: relative;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 28px;
+      position: relative;
+      z-index: 1;
+    }
+    .back-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 8px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.75rem;
+      text-decoration: none;
+      transition: 0.2s;
+    }
+    .back-btn:hover { color: var(--accent); border-color: var(--accent); }
+    .page-title { font-size: 1.3rem; font-weight: 800; color: var(--accent); }
+
+    .content {
+      max-width: 420px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── TABS ── */
+    .tabs {
+      display: flex;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 4px;
+      margin-bottom: 16px;
+      gap: 4px;
+    }
+    .tab-btn {
+      flex: 1;
+      background: none;
+      border: none;
+      color: var(--muted);
+      padding: 10px;
+      border-radius: 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .tab-btn.active {
+      background: var(--surface2);
+      color: var(--accent);
+      border: 1px solid var(--border);
+    }
+
+    /* ── PANEL ── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+    .panel-title {
+      font-size: 0.7rem;
+      font-family: 'Space Mono', monospace;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 18px;
+    }
+    .form-row { margin-bottom: 14px; }
+    label {
+      display: block;
+      font-size: 0.72rem;
+      font-family: 'Space Mono', monospace;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    input, select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 12px 14px;
+      border-radius: 12px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem;
+      outline: none;
+      transition: 0.2s;
+    }
+    input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,229,255,0.08); }
+    input::placeholder { color: var(--muted); }
+
+    .hint {
+      font-size: 0.65rem;
+      font-family: 'Space Mono', monospace;
+      color: var(--muted);
+      margin-top: 5px;
+      line-height: 1.5;
+    }
+    .hint span { color: var(--accent); }
+
+    .section-divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 18px 0 14px;
+    }
+    .section-label {
+      font-size: 0.6rem;
+      font-family: 'Space Mono', monospace;
+      color: var(--muted);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .btn-primary {
+      width: 100%;
+      background: linear-gradient(135deg, var(--accent), #0099cc);
+      color: var(--bg);
+      border: none;
+      padding: 15px;
+      border-radius: 14px;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 800;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: 0.2s;
+      margin-top: 4px;
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,229,255,0.25); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .error-msg {
+      background: rgba(255,71,87,0.1);
+      border: 1px solid rgba(255,71,87,0.3);
+      color: var(--red);
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 0.8rem;
+      margin-top: 12px;
+      display: none;
+    }
+    .success-msg {
+      background: rgba(0,255,136,0.08);
+      border: 1px solid rgba(0,255,136,0.25);
+      color: var(--green);
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 0.8rem;
+      margin-top: 12px;
+      display: none;
+    }
+
+    /* ── ACTIVE PANEL ── */
+    #activePanel { display: none; }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .driver-name { font-size: 1.1rem; font-weight: 700; }
+    .driver-route {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--accent);
+      margin-top: 2px;
+    }
+    .driver-username {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-family: 'Space Mono', monospace;
+      background: rgba(255,71,87,0.1);
+      border: 1px solid rgba(255,71,87,0.3);
+      color: var(--red);
+    }
+    .status-badge.live {
+      background: rgba(0,255,136,0.08);
+      border-color: rgba(0,255,136,0.3);
+      color: var(--green);
+    }
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .status-badge.live .status-dot { animation: pulse 1.2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .stat-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+    }
+    .stat-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.6rem;
+      color: var(--muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .stat-value {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--accent);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .btn-track {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 14px;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 800;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-track.start {
+      background: linear-gradient(135deg, var(--green), #00cc66);
+      color: var(--bg);
+    }
+    .btn-track.stop {
+      background: linear-gradient(135deg, var(--red), #cc2233);
+      color: white;
+    }
+    .btn-track:hover { transform: translateY(-1px); }
+
+    .btn-logout {
+      width: 100%;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 10px;
+      border-radius: 12px;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.7rem;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: 0.2s;
+    }
+    .btn-logout:hover { border-color: var(--red); color: var(--red); }
+
+    .badges-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+    .badge {
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.65rem;
+      font-family: 'Space Mono', monospace;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+    .badge.good { background: rgba(0,255,136,0.08); border-color: rgba(0,255,136,0.3); color: var(--green); }
+    .badge.warn { background: rgba(255,211,42,0.08); border-color: rgba(255,211,42,0.3); color: var(--yellow); }
+    .badge.bad  { background: rgba(255,71,87,0.08); border-color: rgba(255,71,87,0.3); color: var(--red); }
+
+    .slider-row { margin-top: 14px; }
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.65rem;
+      font-family: 'Space Mono', monospace;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .slider-label span { color: var(--accent); }
+    input[type=range] {
+      -webkit-appearance: none;
+      background: var(--border);
+      height: 4px;
+      border-radius: 2px;
+      padding: 0;
+      cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <a href="/" class="back-btn">← Back</a>
+    <div style="display:flex;flex-direction:column;gap:2px;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:2px;color:var(--accent);line-height:1;">🧑‍✈️ Driver Panel</div>
+      <div style="font-family:'Space Mono',monospace;font-size:0.52rem;color:var(--muted);letter-spacing:1px;">BUSTRACK · RESILIENT PUBLIC TRANSPORT</div>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- AUTH TABS -->
+    <div id="authSection">
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('login')">🔑 Login</button>
+        <button class="tab-btn" onclick="switchTab('register')">✍ Register</button>
+      </div>
+
+      <!-- LOGIN FORM -->
+      <div class="panel" id="loginForm">
+        <div class="panel-title">Driver Login</div>
+        <div class="form-row">
+          <label>Username</label>
+          <input type="text" id="loginUsername" placeholder="e.g. rajan_kumar" autocomplete="username"/>
+        </div>
+        <div class="form-row">
+          <label>Password</label>
+          <input type="password" id="loginPassword" placeholder="Your driver password" autocomplete="current-password"/>
+        </div>
+        <button class="btn-primary" id="loginBtn" onclick="loginDriver()">Login →</button>
+        <div class="error-msg" id="loginError"></div>
+        <p class="hint" style="margin-top:14px">Don't have an account? Switch to <span>Register</span> tab above.</p>
+      </div>
+
+      <!-- REGISTER FORM -->
+      <div class="panel" id="registerForm" style="display:none">
+        <div class="panel-title">New Driver Account</div>
+
+        <div class="section-label">Your Personal Login</div>
+        <div class="form-row">
+          <label>Username</label>
+          <input type="text" id="regUsername" placeholder="e.g. rajan_kumar" autocomplete="username"/>
+          <div class="hint">Unique to you — used to login later. <span>Cannot be shared.</span></div>
+        </div>
+        <div class="form-row">
+          <label>Password (your personal password)</label>
+          <input type="password" id="regPassword" placeholder="Min 4 characters" autocomplete="new-password"/>
+          <div class="hint">This is <span>your own</span> password — not the route password.</div>
+        </div>
+
+        <hr class="section-divider">
+        <div class="section-label">Your Info</div>
+        <div class="form-row">
+          <label>Full Name</label>
+          <input type="text" id="driverName" placeholder="e.g. Rajan Kumar"/>
+        </div>
+        <div class="form-row">
+          <label>Bus Number</label>
+          <input type="text" id="busNo" placeholder="e.g. TN-36 AB 1234"/>
+        </div>
+
+        <hr class="section-divider">
+        <div class="section-label">Route Details</div>
+        <div class="form-row">
+          <label>Route Name</label>
+          <input type="text" id="routeName" placeholder="e.g. Route 3 – Hostel to College"/>
+        </div>
+        <div class="form-row">
+          <label>Route ID</label>
+          <input type="text" id="routeId" placeholder="e.g. route-3"/>
+          <div class="hint">Share this with commuters. New = creates route. Existing = joins it.</div>
+        </div>
+        <div class="form-row">
+          <label>Route Password</label>
+          <input type="password" id="routePassword" placeholder="Route-wide shared password"/>
+          <div class="hint">Commuters use this to access the route. <span>Different from your personal password.</span></div>
+        </div>
+
+        <button class="btn-primary" id="registerBtn" onclick="registerDriver()">Create Account →</button>
+        <div class="error-msg" id="registerError"></div>
+        <div class="success-msg" id="registerSuccess"></div>
+      </div>
+    </div>
+
+    <!-- ACTIVE DRIVER PANEL -->
+    <div id="activePanel">
+      <div class="panel">
+        <div class="status-row">
+          <div class="driver-info">
+            <div class="driver-name" id="displayName">—</div>
+            <div class="driver-route" id="displayRoute">—</div>
+            <div class="driver-username" id="displayUsername">—</div>
+          </div>
+          <div class="status-badge" id="statusBadge">
+            <div class="status-dot"></div>
+            <span id="statusText">Offline</span>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="stat-label">Latitude</div>
+            <div class="stat-value" id="statLat">—</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Longitude</div>
+            <div class="stat-value" id="statLng">—</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">GPS Accuracy</div>
+            <div class="stat-value" id="statAcc">—</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Buffered</div>
+            <div class="stat-value" id="statBuf">0 pts</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Uptime</div>
+            <div class="stat-value" id="statUptime">—</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Points Sent</div>
+            <div class="stat-value" id="statPoints">0</div>
+          </div>
+        </div>
+
+        <!-- Background mode warning — shown when screen will lock -->
+        <div id="bgWarning" style="display:none;background:rgba(255,211,42,0.08);border:1px solid rgba(255,211,42,0.3);border-radius:12px;padding:10px 14px;margin-bottom:14px;font-family:'Space Mono',monospace;font-size:0.65rem;color:var(--yellow);line-height:1.6;">
+          ⚠ <strong>Keep screen on</strong> or <strong>add to Home Screen</strong> for 24h background tracking.<br>
+          <span style="color:var(--muted)">Tap the banner below to install as an app for best results.</span>
+        </div>
+
+        <!-- Install PWA prompt -->
+        <div id="installBanner" style="display:none;background:rgba(0,229,255,0.06);border:1px solid rgba(0,229,255,0.2);border-radius:12px;padding:10px 14px;margin-bottom:14px;cursor:pointer;" onclick="installPWA()">
+          <div style="font-size:0.7rem;font-family:'Space Mono',monospace;color:var(--accent);">📲 Add BusTrack to Home Screen</div>
+          <div style="font-size:0.6rem;font-family:'Space Mono',monospace;color:var(--muted);margin-top:3px;">Enables background GPS — tracking continues even when screen locks</div>
+        </div>
+
+        <div class="slider-row">
+          <div class="slider-label">
+            <span>GPS Update Interval</span>
+            <span id="intervalLabel">5s</span>
+          </div>
+          <input type="range" id="intervalSlider" min="3" max="30" value="5"
+            oninput="updateInterval(this.value)"/>
+        </div>
+
+        <button class="btn-track start" id="trackBtn" onclick="toggleTracking()">▶ Start Sharing GPS</button>
+
+        <div class="badges-row">
+          <div class="badge" id="netBadge">🌐 Checking network...</div>
+          <div class="badge" id="serverBadge">🔴 Server</div>
+        </div>
+
+        <button class="btn-logout" onclick="logout()">⏏ Logout</button>
+      </div>
+    </div>
+
+  </div>
+
+
+  <script>
+    const socket = io({ reconnection: true, reconnectionDelay: 1000, reconnectionAttempts: Infinity });
+    let isTracking = false;
+    let watchId = null;
+    let offlineBuffer = [];
+    let currentInterval = 5000;
+    let lastSendTime = 0;
+    let session = null;
+    let wakeLock = null;
+    let trackingStartTime = null;
+    let pointsSent = 0;
+    let uptimeTimer = null;
+    let swReg = null;
+    let deferredInstallPrompt = null;
+    let visibilityRestartTimer = null;
+
+    // ── Service Worker Registration ────────────────
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then(reg => {
+        swReg = reg;
+        if ('periodicSync' in reg) {
+          reg.periodicSync.register('gps-keepalive', { minInterval: 60000 }).catch(() => {});
+        }
+      }).catch(e => console.warn('[SW] failed:', e));
+    }
+
+    // ── PWA Install Prompt ─────────────────────────
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      document.getElementById('installBanner').style.display = 'block';
+    });
+    function installPWA() {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      deferredInstallPrompt.userChoice.then(() => {
+        deferredInstallPrompt = null;
+        document.getElementById('installBanner').style.display = 'none';
+      });
+    }
+
+    // ── Tab switch ─────────────────────────────────
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach((b,i) =>
+        b.classList.toggle('active', (tab==='login'&&i===0)||(tab==='register'&&i===1))
+      );
+      document.getElementById('loginForm').style.display = tab==='login' ? 'block' : 'none';
+      document.getElementById('registerForm').style.display = tab==='register' ? 'block' : 'none';
+    }
+
+    // ── Socket ─────────────────────────────────────
+    socket.on('connect', () => {
+      setBadge('serverBadge', '🟢 Server', 'good');
+      flushBuffer();
+      if (session) socket.emit('driver:start', session);
+    });
+    socket.on('disconnect', () => setBadge('serverBadge', '🔴 Server', 'bad'));
+
+    // ── Login ──────────────────────────────────────
+    async function loginDriver() {
+      const username = document.getElementById('loginUsername').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      if (!username || !password) { showError('loginError', 'Enter username and password'); return; }
+      const btn = document.getElementById('loginBtn');
+      btn.disabled = true; btn.textContent = 'Logging in...';
+      try {
+        const res = await fetch('/api/driver/login', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        session = data;
+        sessionStorage.setItem('driverSession', JSON.stringify(session));
+        showActivePanel();
+        socket.emit('driver:start', session);
+      } catch (err) {
+        showError('loginError', err.message);
+        btn.disabled = false; btn.textContent = 'Login →';
+      }
+    }
+
+    // ── Register ───────────────────────────────────
+    async function registerDriver() {
+      const username     = document.getElementById('regUsername').value.trim();
+      const password     = document.getElementById('regPassword').value;
+      const driverName   = document.getElementById('driverName').value.trim();
+      const busNo        = document.getElementById('busNo').value.trim();
+      const routeName    = document.getElementById('routeName').value.trim();
+      const routeId      = document.getElementById('routeId').value.trim();
+      const routePassword = document.getElementById('routePassword').value;
+      if (!username||!password||!driverName||!busNo||!routeName||!routeId||!routePassword) {
+        showError('registerError', 'All fields are required'); return;
+      }
+      const btn = document.getElementById('registerBtn');
+      btn.disabled = true; btn.textContent = 'Creating account...';
+      try {
+        const res = await fetch('/api/driver/register', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password, driverName, busNo, routeName, routeId, routePassword })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        document.getElementById('registerSuccess').textContent =
+          `✅ Account created! Username: ${data.username}. Logging you in...`;
+        document.getElementById('registerSuccess').style.display = 'block';
+        document.getElementById('registerError').style.display = 'none';
+        session = data;
+        sessionStorage.setItem('driverSession', JSON.stringify(session));
+        setTimeout(() => { showActivePanel(); socket.emit('driver:start', session); }, 1200);
+      } catch (err) {
+        showError('registerError', err.message);
+        btn.disabled = false; btn.textContent = 'Create Account →';
+      }
+    }
+
+    function showActivePanel() {
+      document.getElementById('authSection').style.display = 'none';
+      document.getElementById('activePanel').style.display = 'block';
+      document.getElementById('displayName').textContent = `${session.driverName} • ${session.busNo}`;
+      document.getElementById('displayRoute').textContent = `📍 ${session.routeName} (${session.routeId})`;
+      document.getElementById('displayUsername').textContent = `👤 @${session.username}`;
+      checkNetwork();
+      navigator.serviceWorker?.ready.then(reg => {
+        reg.active?.postMessage({ type: 'SET_SESSION', payload: session });
+      });
+    }
+
+    function logout() {
+      stopTracking();
+      sessionStorage.removeItem('driverSession');
+      navigator.serviceWorker?.ready.then(reg => reg.active?.postMessage({ type: 'CLEAR_SESSION' }));
+      session = null;
+      document.getElementById('activePanel').style.display = 'none';
+      document.getElementById('authSection').style.display = 'block';
+      switchTab('login');
+    }
+
+    // ── GPS Tracking — Wake Lock + background recovery ────────────────
+    function toggleTracking() { isTracking ? stopTracking() : startTracking(); }
+
+    async function startTracking() {
+      if (!navigator.geolocation) { alert('Geolocation not supported!'); return; }
+      isTracking = true;
+      trackingStartTime = Date.now();
+      pointsSent = 0;
+      document.getElementById('trackBtn').textContent = '⏹ Stop Sharing';
+      document.getElementById('trackBtn').className = 'btn-track stop';
+      document.getElementById('statusBadge').className = 'status-badge live';
+      document.getElementById('statusText').textContent = 'Live';
+      document.getElementById('statPoints').textContent = '0';
+
+      await acquireWakeLock();
+      uptimeTimer = setInterval(updateUptime, 1000);
+
+      if (!('wakeLock' in navigator)) {
+        document.getElementById('bgWarning').style.display = 'block';
+      }
+
+      startWatchPosition();
+    }
+
+    function startWatchPosition() {
+      if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          if (!isTracking) return;
+          const now = Date.now();
+          if (now - lastSendTime < currentInterval) return;
+          lastSendTime = now;
+          const data = {
+            routeId: session.routeId, driverId: session.driverId,
+            driverName: session.driverName, busNo: session.busNo,
+            lat: pos.coords.latitude, lng: pos.coords.longitude,
+            accuracy: pos.coords.accuracy, timestamp: Math.floor(now / 1000)
+          };
+          sendOrBuffer(data);
+          document.getElementById('statLat').textContent = data.lat.toFixed(6);
+          document.getElementById('statLng').textContent = data.lng.toFixed(6);
+          document.getElementById('statAcc').textContent = `±${data.accuracy.toFixed(0)}m`;
+          document.getElementById('statBuf').textContent = `${offlineBuffer.length} pts`;
+        },
+        (err) => {
+          document.getElementById('statAcc').textContent = 'GPS Error';
+          console.error('GPS:', err.message);
+          if (isTracking) setTimeout(() => { if (isTracking) startWatchPosition(); }, 5000);
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
+      );
+    }
+
+    function stopTracking() {
+      isTracking = false;
+      if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+      if (uptimeTimer) { clearInterval(uptimeTimer); uptimeTimer = null; }
+      releaseWakeLock();
+      document.getElementById('trackBtn').textContent = '▶ Start Sharing GPS';
+      document.getElementById('trackBtn').className = 'btn-track start';
+      document.getElementById('statusBadge').className = 'status-badge';
+      document.getElementById('statusText').textContent = 'Stopped';
+      document.getElementById('bgWarning').style.display = 'none';
+      trackingStartTime = null;
+    }
+
+    // ── Wake Lock ──────────────────────────────────
+    async function acquireWakeLock() {
+      if (!('wakeLock' in navigator)) return;
+      try {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => { if (isTracking) acquireWakeLock(); });
+      } catch(e) { console.warn('[WakeLock]', e.message); }
+    }
+    function releaseWakeLock() {
+      if (wakeLock) { wakeLock.release().catch(()=>{}); wakeLock = null; }
+    }
+
+    // ── Visibility — restart GPS on tab return ─────
+    document.addEventListener('visibilitychange', () => {
+      if (!isTracking) return;
+      if (!document.hidden) {
+        clearTimeout(visibilityRestartTimer);
+        visibilityRestartTimer = setTimeout(() => {
+          if (isTracking) { startWatchPosition(); acquireWakeLock(); }
+        }, 500);
+      }
+    });
+
+    // ── Send / Buffer ──────────────────────────────
+    function sendOrBuffer(data) {
+      if (socket.connected) {
+        flushBuffer();
+        socket.emit('driver:location', data);
+        pointsSent++;
+        document.getElementById('statPoints').textContent = pointsSent;
+      } else {
+        offlineBuffer.push(data);
+        if (offlineBuffer.length > 500) offlineBuffer.shift();
+        document.getElementById('statBuf').textContent = `${offlineBuffer.length} pts`;
+        navigator.serviceWorker?.ready.then(reg => {
+          reg.active?.postMessage({ type: 'BUFFER_LOCATION', payload: data });
+        });
+      }
+    }
+
+    function flushBuffer() {
+      while (offlineBuffer.length > 0) {
+        socket.emit('driver:location', offlineBuffer.shift());
+        pointsSent++;
+      }
+      document.getElementById('statBuf').textContent = '0 pts';
+      document.getElementById('statPoints').textContent = pointsSent;
+    }
+
+    // ── Uptime display ─────────────────────────────
+    function updateUptime() {
+      if (!trackingStartTime) return;
+      const sec = Math.floor((Date.now() - trackingStartTime) / 1000);
+      const h = Math.floor(sec / 3600), m = Math.floor((sec%3600)/60), s = sec%60;
+      document.getElementById('statUptime').textContent =
+        h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s}s` : `${s}s`;
+    }
+
+    function updateInterval(val) {
+      currentInterval = parseInt(val) * 1000;
+      document.getElementById('intervalLabel').textContent = `${val}s`;
+    }
+
+    function checkNetwork() {
+      const conn = navigator.connection || navigator.mozConnection;
+      if (conn) {
+        const type = conn.effectiveType;
+        if (type === '4g') {
+          setBadge('netBadge', '📶 4G — Good', 'good');
+          if (currentInterval > 5000) { currentInterval=5000; document.getElementById('intervalSlider').value=5; document.getElementById('intervalLabel').textContent='5s'; }
+        } else if (type === '3g') {
+          setBadge('netBadge', '📶 3G — Medium', 'warn');
+          currentInterval = Math.max(currentInterval,10000);
+          document.getElementById('intervalSlider').value=10; document.getElementById('intervalLabel').textContent='10s';
+        } else {
+          setBadge('netBadge', '📶 2G/Slow', 'bad');
+          currentInterval = Math.max(currentInterval,20000);
+          document.getElementById('intervalSlider').value=20; document.getElementById('intervalLabel').textContent='20s';
+        }
+      } else { setBadge('netBadge', '🌐 Network', ''); }
+      setTimeout(checkNetwork, 8000);
+    }
+
+    function setBadge(id, text, cls) {
+      const el = document.getElementById(id);
+      el.textContent = text;
+      el.className = 'badge' + (cls ? ' ' + cls : '');
+    }
+    function showError(id, msg) {
+      const el = document.getElementById(id);
+      el.textContent = '⚠ ' + msg;
+      el.style.display = 'block';
+    }
+
+    // ── Restore session ────────────────────────────
+    const saved = sessionStorage.getItem('driverSession');
+    if (saved) {
+      try {
+        session = JSON.parse(saved);
+        showActivePanel();
+        socket.emit('driver:start', session);
+      } catch(e) { sessionStorage.removeItem('driverSession'); }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "name": "bustrack",
+  "version": "2.0.0",
+  "description": "Resilient college bus tracking system",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "setup-tunnel": "npm install @ngrok/ngrok"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.8.3",
+    "better-sqlite3": "^9.4.3",
+    "bcryptjs": "^2.4.3"
+  },
+  "optionalDependencies": {
+    "@ngrok/ngrok": "^1.4.0"
+  }
+}

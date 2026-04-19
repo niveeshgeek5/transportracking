@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BusTrack — Tracker</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;700;900&family=Bebas+Neue&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #04080f;
+      --surface: #0b1220ee;
+      --surface2: #0f1929;
+      --border: #162035;
+      --accent: #00d4ff;
+      --accent2: #ff5c35;
+      --green: #00e87a;
+      --red: #ff4757;
+      --yellow: #ffd32a;
+      --text: #dde8f5;
+      --muted: #3d5070;
+      --muted2: #5a7090;
+    }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; }
+
+    /* ── LOGIN ── */
+    #loginOverlay {
+      position: fixed; inset: 0;
+      background: var(--bg);
+      z-index: 9999;
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    #loginOverlay::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      animation: gridMove 20s linear infinite;
+    }
+    @keyframes gridMove {
+      0%{background-position:0 0} 100%{background-position:48px 48px}
+    }
+    /* Glow orbs on login screen */
+    .login-orb {
+      position: fixed; border-radius: 50%; filter: blur(100px); pointer-events: none;
+    }
+    .login-orb1 { width:400px;height:400px;background:rgba(0,212,255,0.1);top:-150px;right:-100px; }
+    .login-orb2 { width:350px;height:350px;background:rgba(255,92,53,0.09);bottom:-120px;left:-100px; }
+
+    .login-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 26px;
+      padding: 36px 30px;
+      width: 100%; max-width: 390px;
+      position: relative; z-index: 1;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,212,255,0.05);
+    }
+    .login-brand { text-align: center; margin-bottom: 30px; }
+    .login-brand-icon {
+      font-size: 2.8rem; display: block; margin-bottom: 10px;
+      filter: drop-shadow(0 0 16px rgba(255,92,53,0.5));
+      animation: iconBounce 3s ease-in-out infinite;
+    }
+    @keyframes iconBounce {
+      0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)}
+    }
+    .login-brand-name {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 2.2rem; letter-spacing: 3px;
+      background: linear-gradient(135deg, var(--accent2), #ff8c6a);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      line-height: 1; margin-bottom: 4px;
+    }
+    .login-brand-sub {
+      font-family: 'Space Mono', monospace; font-size: 0.6rem;
+      color: var(--muted2); letter-spacing: 1px;
+    }
+    .login-brand-tag {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(255,92,53,0.08); border: 1px solid rgba(255,92,53,0.2);
+      border-radius: 6px; padding: 5px 10px; margin-top: 10px;
+      font-family: 'Space Mono', monospace; font-size: 0.58rem;
+      color: var(--accent2); letter-spacing: 1px;
+    }
+
+    .form-row { margin-bottom: 14px; }
+    label { display: block; font-size: 0.65rem; font-family: 'Space Mono', monospace; color: var(--muted2); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 7px; }
+    input {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      color: var(--text); padding: 13px 16px; border-radius: 13px;
+      font-family: 'DM Sans', sans-serif; font-size: 0.92rem; outline: none; transition: 0.2s;
+    }
+    input:focus { border-color: var(--accent2); box-shadow: 0 0 0 3px rgba(255,92,53,0.1); }
+    input::placeholder { color: var(--muted); }
+
+    .btn-join {
+      width: 100%;
+      background: linear-gradient(135deg, var(--accent2), #c43800);
+      color: white; border: none; padding: 16px; border-radius: 14px;
+      font-family: 'DM Sans', sans-serif; font-weight: 900; font-size: 1rem;
+      cursor: pointer; transition: 0.25s; margin-top: 6px;
+      letter-spacing: 0.5px;
+    }
+    .btn-join:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(255,92,53,0.35); }
+    .btn-join:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .login-error {
+      background: rgba(255,71,87,0.1); border: 1px solid rgba(255,71,87,0.3);
+      color: var(--red); padding: 10px 14px; border-radius: 10px;
+      font-size: 0.8rem; margin-top: 12px; display: none;
+    }
+
+    /* ── Driver → Tracker connecting line ── */
+    .driver-tracker-line {
+      stroke-dashoffset: 0;
+      animation: dashFlow 1.2s linear infinite;
+    }
+    @keyframes dashFlow {
+      to { stroke-dashoffset: -36; }
+    }
+    .back-link {
+      display: block; text-align: center; margin-top: 16px;
+      font-family: 'Space Mono', monospace; font-size: 0.65rem;
+      color: var(--muted); text-decoration: none;
+    }
+    .back-link:hover { color: var(--accent); }
+
+    /* ── MAP ── */
+    #map { height: 100vh; width: 100%; display: none; }
+    .leaflet-tile { filter: brightness(0.75) saturate(0.5); }
+
+    /* ── TOPBAR ── */
+    #topbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+      background: var(--surface); backdrop-filter: blur(12px);
+      padding: 10px 16px; display: none;
+      align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .topbar-left { display: flex; align-items: center; gap: 10px; }
+    .topbar-logo { font-size: 1.1rem; font-weight: 800; color: var(--accent); }
+    .topbar-route {
+      font-family: 'Space Mono', monospace; font-size: 0.65rem;
+      color: var(--muted); background: var(--surface2);
+      padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border);
+    }
+    .conn-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--red); flex-shrink: 0;
+    }
+    .conn-dot.live { background: var(--green); animation: pulse 1.2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* ── BUS CARDS ── */
+    #busCards {
+      position: fixed;
+      bottom: 0; left: 0; right: 0; z-index: 1000;
+      padding: 12px; display: none; gap: 10px;
+      overflow-x: auto; scrollbar-width: none;
+    }
+    #busCards::-webkit-scrollbar { display: none; }
+    .bus-card {
+      background: var(--surface); backdrop-filter: blur(12px);
+      border: 1px solid var(--border); border-radius: 16px;
+      padding: 14px 16px; min-width: 210px; flex-shrink: 0;
+      cursor: pointer; transition: 0.2s;
+    }
+    .bus-card:hover { border-color: var(--accent); }
+    .bus-card.offline { opacity: 0.5; border-style: dashed; }
+    .bus-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0,229,255,0.18); }
+
+    .bus-card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .bus-no { font-size: 0.85rem; font-weight: 700; color: var(--accent); }
+    .live-badge {
+      font-family: 'Space Mono', monospace; font-size: 0.55rem;
+      padding: 3px 8px; border-radius: 10px;
+      background: rgba(0,255,136,0.1); border: 1px solid rgba(0,255,136,0.3); color: var(--green);
+    }
+    .live-badge.offline {
+      background: rgba(255,71,87,0.1); border-color: rgba(255,71,87,0.3); color: var(--red);
+    }
+    .bus-driver { font-size: 0.75rem; color: var(--muted); margin-bottom: 10px; }
+    .bus-stats { display: flex; gap: 12px; }
+    .bs-label { font-family: 'Space Mono', monospace; font-size: 0.55rem; color: var(--muted); text-transform: uppercase; }
+    .bs-value { font-size: 0.9rem; font-weight: 700; color: var(--text); }
+
+    /* ── HISTORY BTN ── */
+    #historyBtn {
+      position: fixed; top: 56px; right: 12px; z-index: 1000;
+      background: var(--surface); backdrop-filter: blur(12px);
+      border: 1px solid var(--border); border-radius: 12px;
+      padding: 8px 14px; font-family: 'Space Mono', monospace;
+      font-size: 0.65rem; color: var(--muted); cursor: pointer;
+      display: none; transition: 0.2s;
+    }
+    #historyBtn:hover { color: var(--accent); border-color: var(--accent); }
+
+    /* ── HISTORY PANEL (NeoTrack style) ── */
+    #historyPanel {
+      position: fixed; inset: 0; z-index: 1200;
+      background: var(--bg);
+      transform: translateY(100%);
+      transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+      display: flex; flex-direction: column;
+    }
+    #historyPanel.open { transform: translateY(0); }
+
+    .hist-topbar {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+      flex-shrink: 0;
+    }
+    .hist-close {
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--muted); padding: 8px 12px; border-radius: 10px;
+      cursor: pointer; font-family: 'Space Mono', monospace; font-size: 0.75rem;
+      transition: 0.2s;
+    }
+    .hist-close:hover { color: var(--red); border-color: var(--red); }
+    .hist-title { font-size: 1rem; font-weight: 800; color: var(--accent); flex: 1; }
+    .hist-bus-selector {
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); padding: 7px 12px; border-radius: 10px;
+      font-family: 'Space Mono', monospace; font-size: 0.7rem; outline: none;
+    }
+
+    /* Map area for history */
+    #histMap { flex: 1; position: relative; min-height: 0; }
+
+    /* Time info bar */
+    .hist-info-bar {
+      position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+      z-index: 100;
+      background: var(--surface); backdrop-filter: blur(12px);
+      border: 1px solid var(--border); border-radius: 12px;
+      padding: 8px 16px;
+      display: flex; align-items: center; gap: 16px;
+      font-family: 'Space Mono', monospace; font-size: 0.7rem;
+      white-space: nowrap;
+    }
+    .hist-time-display { color: var(--accent); font-weight: 700; }
+    .hist-speed-display { color: var(--green); }
+    .hist-pos-display { color: var(--muted); }
+
+    /* Scrubber container */
+    .scrubber-wrap {
+      flex-shrink: 0;
+      padding: 16px 20px 20px;
+      background: var(--surface2);
+      border-top: 1px solid var(--border);
+    }
+    .scrubber-header {
+      display: flex; justify-content: space-between;
+      font-family: 'Space Mono', monospace; font-size: 0.6rem;
+      color: var(--muted); margin-bottom: 10px;
+    }
+    .scrubber-header span { color: var(--accent); }
+
+    /* The NeoTrack-style timeline */
+    .timeline-container {
+      position: relative;
+      height: 48px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .timeline-track {
+      position: absolute;
+      top: 50%; left: 0; right: 0;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      transform: translateY(-50%);
+    }
+    .timeline-fill {
+      position: absolute;
+      top: 50%; left: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--accent), #0099cc);
+      border-radius: 2px;
+      transform: translateY(-50%);
+      transition: width 0.05s;
+      pointer-events: none;
+    }
+    /* Speed sparkline dots on the track */
+    .timeline-dot {
+      position: absolute;
+      top: 50%; transform: translate(-50%, -50%);
+      width: 3px; height: 3px;
+      border-radius: 50%;
+      background: var(--accent);
+      opacity: 0.4;
+      pointer-events: none;
+    }
+    .timeline-dot.stop { background: var(--yellow); }
+    /* Thumb */
+    .timeline-thumb {
+      position: absolute;
+      top: 50%; transform: translate(-50%, -50%);
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 3px solid var(--bg);
+      box-shadow: 0 0 0 4px rgba(0,229,255,0.25);
+      cursor: grab;
+      z-index: 2;
+      transition: box-shadow 0.15s;
+    }
+    .timeline-thumb:active { cursor: grabbing; box-shadow: 0 0 0 8px rgba(0,229,255,0.2); }
+
+    /* Time label ticks */
+    .timeline-ticks {
+      position: absolute;
+      top: calc(50% + 12px); left: 0; right: 0;
+      display: flex; justify-content: space-between;
+      pointer-events: none;
+    }
+    .tick-label {
+      font-family: 'Space Mono', monospace; font-size: 0.55rem;
+      color: var(--muted);
+    }
+
+    .scrubber-stats {
+      display: flex; gap: 16px; margin-top: 14px;
+    }
+    .scrub-stat {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px 14px; flex: 1; text-align: center;
+    }
+    .scrub-stat-label {
+      font-family: 'Space Mono', monospace; font-size: 0.55rem;
+      color: var(--muted); text-transform: uppercase; letter-spacing: 1px;
+    }
+    .scrub-stat-val {
+      font-size: 1rem; font-weight: 700; color: var(--accent); margin-top: 3px;
+    }
+
+    .hist-loading {
+      display: flex; align-items: center; justify-content: center;
+      height: 100%; font-family: 'Space Mono', monospace;
+      font-size: 0.8rem; color: var(--muted);
+    }
+
+    /* ── History span line ── */
+    .hist-span-line {
+      animation: spanDash 1.5s linear infinite;
+    }
+    @keyframes spanDash {
+      to { stroke-dashoffset: -28; }
+    }
+    /* Leaflet tooltip for span label */
+    .span-tooltip {
+      background: rgba(0,232,122,0.12) !important;
+      border: 1px solid rgba(0,232,122,0.4) !important;
+      color: #00e87a !important;
+      font-family: 'Space Mono', monospace !important;
+      font-size: 0.62rem !important;
+      font-weight: 700 !important;
+      padding: 4px 10px !important;
+      border-radius: 8px !important;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4) !important;
+      white-space: nowrap !important;
+    }
+    .span-tooltip::before { display: none !important; }
+
+    /* ── NO BUS ── */
+    #noBusMsg {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 500;
+      background: var(--surface); backdrop-filter: blur(12px);
+      border: 1px solid var(--border); border-radius: 16px;
+      padding: 24px 28px; text-align: center; display: none;
+    }
+    #noBusMsg .nb-icon { font-size: 2rem; display: block; margin-bottom: 8px; }
+    #noBusMsg p { font-family: 'Space Mono', monospace; font-size: 0.72rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+
+  <!-- LOGIN -->
+  <div id="loginOverlay">
+    <div class="login-orb login-orb1"></div>
+    <div class="login-orb login-orb2"></div>
+    <div class="login-box">
+      <div class="login-brand">
+        <span class="login-brand-icon">📡</span>
+        <div class="login-brand-name">Tracker</div>
+        <div class="login-brand-sub">BusTrack · Live Route Tracking</div>
+        <div class="login-brand-tag">⚡ Resilient Public Transport System</div>
+      </div>
+      <div class="form-row">
+        <label>Route ID</label>
+        <input type="text" id="loginRouteId" placeholder="e.g. route-3"/>
+      </div>
+      <div class="form-row">
+        <label>Password</label>
+        <input type="password" id="loginPassword" placeholder="Route password"/>
+      </div>
+      <button class="btn-join" id="joinBtn" onclick="joinRoute()">Track Live →</button>
+      <div class="login-error" id="loginError"></div>
+      <a href="/" class="back-link">← Back to home</a>
+    </div>
+  </div>
+
+  <!-- LIVE MAP -->
+  <div id="topbar">
+    <div class="topbar-left">
+      <div class="topbar-logo">🚌 BusTrack</div>
+      <div class="topbar-route" id="topbarRoute">—</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:0.55rem;color:var(--accent2);background:rgba(255,92,53,0.08);border:1px solid rgba(255,92,53,0.2);padding:3px 8px;border-radius:10px;">📡 TRACKER</div>
+      <div class="conn-dot" id="connDot"></div>
+    </div>
+  </div>
+
+  <div id="map"></div>
+  <button id="historyBtn" onclick="openHistory()">📋 History</button>
+  <div id="busCards"></div>
+  <div id="noBusMsg">
+    <span class="nb-icon">🔍</span>
+    <p>Waiting for driver<br>to start sharing...</p>
+  </div>
+
+  <!-- HISTORY PANEL — NEOTRACK STYLE -->
+  <div id="historyPanel">
+    <div class="hist-topbar">
+      <button class="hist-close" onclick="closeHistory()">✕ Close</button>
+      <div class="hist-title">📍 Route History</div>
+      <select class="hist-bus-selector" id="histBusSelector" onchange="changeBus(this.value)">
+        <option value="">Loading...</option>
+      </select>
+    </div>
+
+    <!-- History map fills this area -->
+    <div id="histMap">
+      <div class="hist-loading" id="histLoading">Loading history...</div>
+      <div class="hist-info-bar" id="histInfoBar" style="display:none">
+        <span class="hist-time-display" id="histTime">—</span>
+        <span class="hist-speed-display" id="histSpeed">— km/h</span>
+        <span class="hist-pos-display" id="histPos">—</span>
+      </div>
+    </div>
+
+    <!-- Scrubber -->
+    <div class="scrubber-wrap">
+      <div class="scrubber-header">
+        <span id="scrubStart">—</span>
+        <span>▶ Drag to scrub through route history</span>
+        <span id="scrubEnd">—</span>
+      </div>
+      <div class="timeline-container" id="timelineContainer"
+           onmousedown="scrubStart(event)" ontouchstart="scrubStart(event)">
+        <div class="timeline-track"></div>
+        <div class="timeline-fill" id="timelineFill" style="width:0%"></div>
+        <div id="timelineDots"></div>
+        <div class="timeline-thumb" id="timelineThumb" style="left:0%"></div>
+        <div class="timeline-ticks" id="timelineTicks"></div>
+      </div>
+      <div class="scrubber-stats">
+        <div class="scrub-stat">
+          <div class="scrub-stat-label">Points</div>
+          <div class="scrub-stat-val" id="scrubPoints">—</div>
+        </div>
+        <div class="scrub-stat">
+          <div class="scrub-stat-label">Duration</div>
+          <div class="scrub-stat-val" id="scrubDuration">—</div>
+        </div>
+        <div class="scrub-stat">
+          <div class="scrub-stat-label">Max Speed</div>
+          <div class="scrub-stat-val" id="scrubMaxSpeed">—</div>
+        </div>
+        <div class="scrub-stat">
+          <div class="scrub-stat-label">Distance</div>
+          <div class="scrub-stat-val" id="scrubDistance">—</div>
+        </div>
+        <div class="scrub-stat" style="border-color:rgba(0,232,122,0.25);background:rgba(0,232,122,0.05);">
+          <div class="scrub-stat-label" style="color:#00e87a;">▶—■ Span</div>
+          <div class="scrub-stat-val" id="scrubSpanDist" style="color:#00e87a;">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+    let routeSession = null;
+    const buses = {};
+    let map, userMarker, userLocation;
+    const driverToTrackerLines = {}; // driverId -> L.polyline (the live line)
+
+    // ── Socket ──────────────────────────────────
+    socket.on('connect', () => {
+      document.getElementById('connDot').classList.add('live');
+      if (routeSession) socket.emit('tracker:join', { routeId: routeSession.routeId });
+    });
+    socket.on('disconnect', () => document.getElementById('connDot').classList.remove('live'));
+    socket.on('bus:update', (data) => {
+      document.getElementById('noBusMsg').style.display = 'none';
+      updateBus(data);
+    });
+    socket.on('bus:offline', ({ driverId }) => {
+      if (buses[driverId]) {
+        const card = buses[driverId].card;
+        card?.querySelector('.live-badge')?.classList.add('offline');
+        if (card?.querySelector('.live-badge')) card.querySelector('.live-badge').textContent = 'OFFLINE';
+        card?.classList.add('offline');
+      }
+    });
+
+    // ── Join ────────────────────────────────────
+    async function joinRoute() {
+      const routeId = document.getElementById('loginRouteId').value.trim().toLowerCase().replace(/\s+/g,'-');
+      const password = document.getElementById('loginPassword').value;
+      if (!routeId || !password) { showLoginError('Fill all fields'); return; }
+
+      const btn = document.getElementById('joinBtn');
+      btn.disabled = true; btn.textContent = 'Joining...';
+
+      try {
+        const res = await fetch('/api/join-route', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ routeId, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        routeSession = { routeId: data.routeId, routeName: data.routeName, password };
+        sessionStorage.setItem('trackerSession', JSON.stringify(routeSession));
+        launchMap();
+        socket.emit('tracker:join', { routeId: data.routeId });
+      } catch (err) {
+        showLoginError(err.message);
+        btn.disabled = false; btn.textContent = 'Track Live →';
+      }
+    }
+
+    // ── Launch map ──────────────────────────────
+    function launchMap() {
+      document.getElementById('loginOverlay').style.display = 'none';
+      document.getElementById('map').style.display = 'block';
+      document.getElementById('topbar').style.display = 'flex';
+      document.getElementById('busCards').style.display = 'flex';
+      document.getElementById('historyBtn').style.display = 'block';
+      document.getElementById('noBusMsg').style.display = 'block';
+      document.getElementById('topbarRoute').textContent = `📍 ${routeSession.routeName}`;
+
+      map = L.map('map', { zoomControl: false }).setView([10.9141, 79.4453], 15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+      }).addTo(map);
+      L.control.zoom({ position: 'topright' }).addTo(map);
+
+      if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(
+          (pos) => {
+            userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            const ll = L.latLng(userLocation.lat, userLocation.lng);
+            if (!userMarker) {
+              userMarker = L.marker(ll, { icon: makeTrackerIcon() }).addTo(map).bindPopup('📡 You (Tracker)');
+              map.setView(ll, 15);
+            } else {
+              userMarker.setLatLng(ll);
+            }
+            Object.values(buses).forEach(b => {
+              if (b.lastData) updateBusCard(b);
+              updateDriverTrackerLine(b);
+            });
+          },
+          () => {},
+          { enableHighAccuracy: true, maximumAge: 3000 }
+        );
+      }
+    }
+
+    // ── Bus update ──────────────────────────────
+    function updateBus(data) {
+      const { driverId } = data;
+      const ll = L.latLng(data.lat, data.lng);
+
+      if (!buses[driverId]) {
+        const color = randomColor(driverId);
+        const marker = L.marker(ll, { icon: makeIcon('🚌', color) }).addTo(map);
+        const pathLine = L.polyline([], { color, weight: 3, opacity: 0.6 }).addTo(map);
+        const card = makeCard(data, color);
+        buses[driverId] = { marker, pathLine, pathCoords: [ll], card, lastData: data, color };
+        document.getElementById('busCards').appendChild(card);
+      } else {
+        const bus = buses[driverId];
+        bus.lastData = data;
+        animateMarker(bus.marker, bus.marker.getLatLng(), ll, 1500);
+        bus.pathCoords.push(ll);
+        if (bus.pathCoords.length > 300) bus.pathCoords.shift();
+        bus.pathLine.setLatLngs(bus.pathCoords);
+        bus.pathLine.setStyle({ dashArray: null });
+        updateBusCard(bus);
+      }
+      updateDriverTrackerLine(buses[driverId]);
+    }
+
+    // ── Driver → Tracker line ───────────────────
+    function updateDriverTrackerLine(bus) {
+      if (!bus || !bus.lastData || !userLocation) return;
+      const driverId = bus.lastData.driverId;
+      const busLl = [bus.lastData.lat, bus.lastData.lng];
+      const trackerLl = [userLocation.lat, userLocation.lng];
+
+      if (!driverToTrackerLines[driverId]) {
+        // Dashed animated line between bus and tracker
+        driverToTrackerLines[driverId] = L.polyline([busLl, trackerLl], {
+          color: bus.color,
+          weight: 2,
+          opacity: 0.55,
+          dashArray: '8 10',
+          className: 'driver-tracker-line'
+        }).addTo(map);
+      } else {
+        driverToTrackerLines[driverId].setLatLngs([busLl, trackerLl]);
+      }
+    }
+
+    // ── Card ────────────────────────────────────
+    function makeCard(data, color) {
+      const card = document.createElement('div');
+      card.className = 'bus-card';
+      card.id = `card-${data.driverId}`;
+      card.onclick = () => {
+        document.querySelectorAll('.bus-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        const bus = buses[data.driverId];
+        if (bus?.lastData) map.setView([bus.lastData.lat, bus.lastData.lng], 17);
+      };
+      card.innerHTML = `
+        <div class="bus-card-header">
+          <div class="bus-no" style="color:${color}">${data.busNo}</div>
+          <div class="live-badge">LIVE</div>
+        </div>
+        <div class="bus-driver">🧑‍✈️ ${data.driverName}</div>
+        <div class="bus-stats">
+          <div class="bus-stat">
+            <div class="bs-label">ETA</div>
+            <div class="bs-value eta-val">—</div>
+          </div>
+          <div class="bus-stat">
+            <div class="bs-label">Dist</div>
+            <div class="bs-value dist-val">—</div>
+          </div>
+          <div class="bus-stat">
+            <div class="bs-label">Speed</div>
+            <div class="bs-value spd-val">—</div>
+          </div>
+        </div>
+        <div style="margin-top:10px;display:flex;align-items:center;gap:6px;
+             background:rgba(0,0,0,0.2);border-radius:8px;padding:6px 10px;border:1px solid ${color}22;">
+          <span style="font-size:0.7rem;">📡</span>
+          <span style="font-family:'Space Mono',monospace;font-size:0.58rem;color:#5a7090;">Line to you:</span>
+          <span class="line-dist-val" style="font-family:'Space Mono',monospace;font-size:0.62rem;color:${color};font-weight:700;margin-left:auto;">—</span>
+        </div>
+      `;
+      return card;
+    }
+
+    function updateBusCard(bus) {
+      const { card, lastData } = bus;
+      if (!card) return;
+      const speed = lastData.speedKmh || 0;
+      card.querySelector('.spd-val').textContent = `${speed.toFixed(0)} km/h`;
+      card.querySelector('.live-badge').classList.remove('offline');
+      card.querySelector('.live-badge').textContent = 'LIVE';
+      card.classList.remove('offline');
+
+      if (!userLocation) {
+        card.querySelector('.eta-val').textContent = '—';
+        card.querySelector('.dist-val').textContent = '—';
+        const ldv = card.querySelector('.line-dist-val');
+        if (ldv) ldv.textContent = '—';
+        return;
+      }
+
+      const dist = getDistance(lastData.lat, lastData.lng, userLocation.lat, userLocation.lng);
+      const distStr = dist < 1 ? `${(dist * 1000).toFixed(0)}m` : `${dist.toFixed(2)}km`;
+      card.querySelector('.dist-val').textContent = distStr;
+      const ldv = card.querySelector('.line-dist-val');
+      if (ldv) ldv.textContent = distStr;
+
+      if (dist < 0.15) {
+        card.querySelector('.eta-val').textContent = '🚌 Now!';
+      } else if (speed < 2) {
+        card.querySelector('.eta-val').textContent = '⏳ Waiting';
+      } else {
+        const etaMin = (dist / speed) * 60;
+        card.querySelector('.eta-val').textContent =
+          etaMin < 1 ? '< 1 min' : `${Math.round(etaMin)} min`;
+      }
+    }
+
+    // ══════════════════════════════════════════════
+    // HISTORY — NEOTRACK STYLE TIMELINE SCRUBBER
+    // ══════════════════════════════════════════════
+
+    let histMap = null;
+    let histData = {};
+    let activeBus = null;
+    let histMarker = null;
+    let histPath = null;
+    let histTrailPath = null;
+    let histSpanLine = null;
+    let histStartMarker = null;
+    let histEndMarker = null;
+    let scrubIndex = 0;
+    let isDragging = false;
+
+    async function openHistory() {
+      const panel = document.getElementById('historyPanel');
+      panel.style.display = 'flex';
+      panel.style.flexDirection = 'column';
+      setTimeout(() => panel.classList.add('open'), 10);
+
+      // Init history map if not done yet
+      if (!histMap) {
+        histMap = L.map('histMap', { zoomControl: false }).setView([10.9141, 79.4453], 14);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap'
+        }).addTo(histMap);
+        L.control.zoom({ position: 'topright' }).addTo(histMap);
+      }
+
+      await loadHistoryData();
+    }
+
+    function closeHistory() {
+      const panel = document.getElementById('historyPanel');
+      panel.classList.remove('open');
+      setTimeout(() => { panel.style.display = 'none'; }, 350);
+    }
+
+    async function loadHistoryData() {
+      document.getElementById('histLoading').style.display = 'flex';
+      document.getElementById('histInfoBar').style.display = 'none';
+
+      try {
+        const res = await fetch(
+          `/api/history/${routeSession.routeId}?password=${encodeURIComponent(routeSession.password)}`
+        );
+        const data = await res.json();
+
+        if (!data.history?.length) {
+          document.getElementById('histLoading').innerHTML = '<span>No history recorded yet</span>';
+          return;
+        }
+
+        // Group by bus_no
+        histData = {};
+        data.history.forEach(row => {
+          if (!histData[row.bus_no]) histData[row.bus_no] = [];
+          histData[row.bus_no].push(row);
+        });
+
+        // Populate bus selector
+        const sel = document.getElementById('histBusSelector');
+        sel.innerHTML = '';
+        Object.keys(histData).forEach((busNo, i) => {
+          const opt = document.createElement('option');
+          opt.value = busNo;
+          opt.textContent = busNo;
+          sel.appendChild(opt);
+        });
+
+        document.getElementById('histLoading').style.display = 'none';
+        const firstBus = Object.keys(histData)[0];
+        activeBus = firstBus;
+        renderBusHistory(firstBus);
+
+      } catch (err) {
+        document.getElementById('histLoading').innerHTML = `<span style="color:var(--red)">Error: ${err.message}</span>`;
+      }
+    }
+
+    function changeBus(busNo) {
+      if (!busNo || !histData[busNo]) return;
+      activeBus = busNo;
+      renderBusHistory(busNo);
+    }
+
+    function renderBusHistory(busNo) {
+      const rows = histData[busNo];
+      if (!rows?.length) return;
+
+      // Clear old layers
+      if (histPath) { histMap.removeLayer(histPath); histPath = null; }
+      if (histTrailPath) { histMap.removeLayer(histTrailPath); histTrailPath = null; }
+      if (histMarker) { histMap.removeLayer(histMarker); histMarker = null; }
+      if (histSpanLine) { histMap.removeLayer(histSpanLine); histSpanLine = null; }
+      if (histStartMarker) { histMap.removeLayer(histStartMarker); histStartMarker = null; }
+      if (histEndMarker) { histMap.removeLayer(histEndMarker); histEndMarker = null; }
+
+      const startPt = [rows[0].lat, rows[0].lng];
+      const endPt   = [rows[rows.length - 1].lat, rows[rows.length - 1].lng];
+
+      // Draw full ghost path
+      const allCoords = rows.map(r => [r.lat, r.lng]);
+      histPath = L.polyline(allCoords, {
+        color: '#1a2540', weight: 3, opacity: 1, dashArray: null
+      }).addTo(histMap);
+
+      // Trail path (colored, grows as you scrub)
+      histTrailPath = L.polyline([], {
+        color: '#00d4ff', weight: 3, opacity: 0.85
+      }).addTo(histMap);
+
+      // ── Start → End span line ──────────────────
+      const spanDist = getDistance(rows[0].lat, rows[0].lng, rows[rows.length-1].lat, rows[rows.length-1].lng);
+      const spanDistStr = spanDist < 1 ? `${(spanDist*1000).toFixed(0)}m` : `${spanDist.toFixed(2)}km`;
+
+      histSpanLine = L.polyline([startPt, endPt], {
+        color: '#00e87a',
+        weight: 2,
+        opacity: 0.7,
+        dashArray: '6 8',
+        className: 'hist-span-line'
+      }).addTo(histMap);
+
+      // Midpoint label on the span line
+      const midLat = (rows[0].lat + rows[rows.length-1].lat) / 2;
+      const midLng = (rows[0].lng + rows[rows.length-1].lng) / 2;
+      histSpanLine.bindTooltip(`📏 Span: ${spanDistStr}`, {
+        permanent: true, direction: 'top', className: 'span-tooltip',
+        offset: [0, -4]
+      }).openTooltip([midLat, midLng]);
+
+      // Start marker — green flag
+      histStartMarker = L.marker(startPt, {
+        icon: L.divIcon({
+          html: `<div style="
+            background:#00e87a;color:#04080f;border-radius:8px;
+            padding:3px 7px;font-size:0.65rem;font-weight:900;
+            font-family:'Space Mono',monospace;white-space:nowrap;
+            box-shadow:0 2px 8px rgba(0,232,122,0.4);
+            border:1px solid rgba(0,232,122,0.6);">▶ START</div>`,
+          className: '', iconAnchor: [0, 10]
+        })
+      }).addTo(histMap).bindPopup(`🚌 Route start<br><small>${new Date(rows[0].timestamp*1000).toLocaleTimeString()}</small>`);
+
+      // End marker — orange flag
+      histEndMarker = L.marker(endPt, {
+        icon: L.divIcon({
+          html: `<div style="
+            background:#ff5c35;color:#fff;border-radius:8px;
+            padding:3px 7px;font-size:0.65rem;font-weight:900;
+            font-family:'Space Mono',monospace;white-space:nowrap;
+            box-shadow:0 2px 8px rgba(255,92,53,0.4);
+            border:1px solid rgba(255,92,53,0.6);">■ END</div>`,
+          className: '', iconAnchor: [0, 10]
+        })
+      }).addTo(histMap).bindPopup(`🏁 Route end<br><small>${new Date(rows[rows.length-1].timestamp*1000).toLocaleTimeString()}</small>`);
+
+      // Bus marker at start
+      histMarker = L.marker(startPt, {
+        icon: makeIcon('🚌', '#00d4ff')
+      }).addTo(histMap);
+
+      histMap.fitBounds(histPath.getBounds(), { padding: [40, 40] });
+
+      // Update span distance in stats bar
+      const spanEl = document.getElementById('scrubSpanDist');
+      if (spanEl) spanEl.textContent = spanDistStr;
+
+      // Build timeline dots (speed indicators)
+      buildTimelineDots(rows);
+
+      // Set time labels
+      const t0 = new Date(rows[0].timestamp * 1000);
+      const t1 = new Date(rows[rows.length - 1].timestamp * 1000);
+      document.getElementById('scrubStart').textContent = t0.toLocaleTimeString();
+      document.getElementById('scrubEnd').textContent = t1.toLocaleTimeString();
+
+      // Stats
+      document.getElementById('scrubPoints').textContent = rows.length;
+      const durMin = Math.round((rows[rows.length-1].timestamp - rows[0].timestamp) / 60);
+      document.getElementById('scrubDuration').textContent = durMin < 60
+        ? `${durMin}m` : `${Math.floor(durMin/60)}h ${durMin%60}m`;
+      const maxSpeed = Math.max(...rows.map(r => r.speed_kmh || 0));
+      document.getElementById('scrubMaxSpeed').textContent = `${maxSpeed.toFixed(0)} km/h`;
+      let totalDist = 0;
+      for (let i = 1; i < rows.length; i++) {
+        totalDist += getDistance(rows[i-1].lat, rows[i-1].lng, rows[i].lat, rows[i].lng);
+      }
+      document.getElementById('scrubDistance').textContent =
+        totalDist < 1 ? `${(totalDist*1000).toFixed(0)}m` : `${totalDist.toFixed(2)}km`;
+
+      // Build tick labels
+      buildTicks(rows);
+
+      scrubIndex = rows.length - 1;
+      seekTo(scrubIndex);
+    }
+
+    function buildTimelineDots(rows) {
+      const container = document.getElementById('timelineDots');
+      container.innerHTML = '';
+      const n = rows.length;
+      rows.forEach((row, i) => {
+        const pct = n > 1 ? (i / (n - 1)) * 100 : 0;
+        const dot = document.createElement('div');
+        dot.className = 'timeline-dot' + (row.speed_kmh < 2 ? ' stop' : '');
+        dot.style.left = pct + '%';
+        container.appendChild(dot);
+      });
+    }
+
+    function buildTicks(rows) {
+      const container = document.getElementById('timelineTicks');
+      container.innerHTML = '';
+      const n = rows.length;
+      const numTicks = Math.min(5, n);
+      for (let i = 0; i < numTicks; i++) {
+        const idx = Math.floor(i / (numTicks - 1) * (n - 1));
+        const pct = n > 1 ? (idx / (n - 1)) * 100 : 0;
+        const tick = document.createElement('div');
+        tick.className = 'tick-label';
+        tick.style.position = 'absolute';
+        tick.style.left = pct + '%';
+        tick.style.transform = 'translateX(-50%)';
+        tick.textContent = new Date(rows[idx].timestamp * 1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+        container.appendChild(tick);
+      }
+    }
+
+    function seekTo(index) {
+      const rows = histData[activeBus];
+      if (!rows) return;
+      scrubIndex = Math.max(0, Math.min(index, rows.length - 1));
+      const row = rows[scrubIndex];
+      const pct = rows.length > 1 ? (scrubIndex / (rows.length - 1)) * 100 : 0;
+
+      // Move thumb + fill
+      document.getElementById('timelineThumb').style.left = pct + '%';
+      document.getElementById('timelineFill').style.width = pct + '%';
+
+      // Move marker
+      const ll = [row.lat, row.lng];
+      histMarker.setLatLng(ll);
+
+      // Update trail
+      const trailCoords = rows.slice(0, scrubIndex + 1).map(r => [r.lat, r.lng]);
+      histTrailPath.setLatLngs(trailCoords);
+
+      // Pan map if marker is outside view
+      if (!histMap.getBounds().contains(ll)) {
+        histMap.panTo(ll, { animate: true, duration: 0.3 });
+      }
+
+      // Update info bar
+      document.getElementById('histInfoBar').style.display = 'flex';
+      const t = new Date(row.timestamp * 1000);
+      document.getElementById('histTime').textContent = t.toLocaleTimeString();
+      document.getElementById('histSpeed').textContent = `${(row.speed_kmh || 0).toFixed(1)} km/h`;
+      document.getElementById('histPos').textContent =
+        `${row.lat.toFixed(5)}, ${row.lng.toFixed(5)}`;
+    }
+
+    // ── Scrubber drag ───────────────────────────
+    function scrubStart(e) {
+      e.preventDefault();
+      isDragging = true;
+      scrubMove(e);
+      document.addEventListener('mousemove', scrubMove);
+      document.addEventListener('mouseup', scrubEnd);
+      document.addEventListener('touchmove', scrubMove, { passive: false });
+      document.addEventListener('touchend', scrubEnd);
+    }
+    function scrubMove(e) {
+      if (!isDragging) return;
+      e.preventDefault();
+      const rows = histData[activeBus];
+      if (!rows?.length) return;
+      const container = document.getElementById('timelineContainer');
+      const rect = container.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      const index = Math.round(pct * (rows.length - 1));
+      seekTo(index);
+    }
+    function scrubEnd() {
+      isDragging = false;
+      document.removeEventListener('mousemove', scrubMove);
+      document.removeEventListener('mouseup', scrubEnd);
+      document.removeEventListener('touchmove', scrubMove);
+      document.removeEventListener('touchend', scrubEnd);
+    }
+
+    // ── Helpers ─────────────────────────────────
+    function makeIcon(emoji, color) {
+      return L.divIcon({
+        html: `<div style="background:${color};border-radius:50%;width:38px;height:38px;
+               display:flex;align-items:center;justify-content:center;font-size:18px;
+               box-shadow:0 0 0 6px ${color}33;border:2px solid ${color}">${emoji}</div>`,
+        className: '', iconSize: [38, 38], iconAnchor: [19, 19]
+      });
+    }
+
+    function makeTrackerIcon() {
+      return L.divIcon({
+        html: `<div style="
+          position:relative;
+          width:42px;height:42px;
+          display:flex;align-items:center;justify-content:center;">
+          <div style="
+            position:absolute;inset:0;border-radius:50%;
+            border:2px solid #ff5c35;
+            animation:trackerRing 1.8s ease-out infinite;
+            opacity:0.7;">
+          </div>
+          <div style="
+            background:#ff5c35;border-radius:50%;
+            width:30px;height:30px;
+            display:flex;align-items:center;justify-content:center;
+            font-size:15px;
+            box-shadow:0 0 0 4px rgba(255,92,53,0.25);
+            border:2px solid rgba(255,92,53,0.8)">📡</div>
+        </div>
+        <style>
+          @keyframes trackerRing {
+            0%{transform:scale(1);opacity:0.7}
+            100%{transform:scale(2.2);opacity:0}
+          }
+        </style>`,
+        className: '', iconSize: [42, 42], iconAnchor: [21, 21]
+      });
+    }
+
+    function randomColor(seed) {
+      const colors = ['#00e5ff','#ff6b35','#ff4757','#ffd32a','#00ff88','#a855f7','#f472b6'];
+      let h = 0;
+      for (let c of String(seed)) h = (h * 31 + c.charCodeAt(0)) & 0xffff;
+      return colors[h % colors.length];
+    }
+
+    function animateMarker(marker, from, to, duration) {
+      const start = performance.now();
+      function step(now) {
+        const t = Math.min((now - start) / duration, 1);
+        const ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t;
+        marker.setLatLng([
+          from.lat + (to.lat - from.lat) * ease,
+          from.lng + (to.lng - from.lng) * ease
+        ]);
+        if (t < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+    function getDistance(lat1, lng1, lat2, lng2) {
+      // WGS84 ellipsoid parameters for accurate distance (matches Google Maps)
+      const a = 6378.137;   // equatorial radius km
+      const b = 6356.752;   // polar radius km
+      const f = 1 / 298.257223563;
+
+      const φ1 = lat1 * Math.PI / 180;
+      const φ2 = lat2 * Math.PI / 180;
+      const λ1 = lng1 * Math.PI / 180;
+      const λ2 = lng2 * Math.PI / 180;
+
+      const L  = λ2 - λ1;
+      const tanU1 = (1 - f) * Math.tan(φ1);
+      const tanU2 = (1 - f) * Math.tan(φ2);
+      const cosU1 = 1 / Math.sqrt(1 + tanU1 * tanU1);
+      const sinU1 = tanU1 * cosU1;
+      const cosU2 = 1 / Math.sqrt(1 + tanU2 * tanU2);
+      const sinU2 = tanU2 * cosU2;
+
+      let λ = L, λʹ, iterLimit = 100;
+      let sinσ, cosσ, σ, sinα, cos2α, cos2σm, C;
+      do {
+        const sinλ = Math.sin(λ);
+        const cosλ = Math.cos(λ);
+        sinσ = Math.sqrt(
+          (cosU2 * sinλ) ** 2 +
+          (cosU1 * sinU2 - sinU1 * cosU2 * cosλ) ** 2
+        );
+        if (sinσ === 0) return 0; // coincident points
+        cosσ  = sinU1 * sinU2 + cosU1 * cosU2 * cosλ;
+        σ     = Math.atan2(sinσ, cosσ);
+        sinα  = cosU1 * cosU2 * sinλ / sinσ;
+        cos2α = 1 - sinα * sinα;
+        cos2σm = cos2α !== 0 ? cosσ - 2 * sinU1 * sinU2 / cos2α : 0;
+        C = f / 16 * cos2α * (4 + f * (4 - 3 * cos2α));
+        λʹ = λ;
+        λ = L + (1 - C) * f * sinα *
+            (σ + C * sinσ * (cos2σm + C * cosσ * (-1 + 2 * cos2σm ** 2)));
+      } while (Math.abs(λ - λʹ) > 1e-12 && --iterLimit > 0);
+
+      if (iterLimit === 0) {
+        // Fallback to Haversine on failure to converge
+        const R = 6371.009;
+        const dLat = φ2 - φ1;
+        const dLng = λ2 - λ1;
+        const aa = Math.sin(dLat/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(dLng/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(aa), Math.sqrt(1-aa));
+      }
+
+      const uSq = cos2α * (a * a - b * b) / (b * b);
+      const A2  = 1 + uSq / 16384 * (4096 + uSq * (-768 + uSq * (320 - 175 * uSq)));
+      const B2  = uSq / 1024 * (256 + uSq * (-128 + uSq * (74 - 47 * uSq)));
+      const Δσ  = B2 * sinσ * (cos2σm + B2 / 4 *
+        (cosσ * (-1 + 2 * cos2σm ** 2) -
+         B2 / 6 * cos2σm * (-3 + 4 * sinσ ** 2) * (-3 + 4 * cos2σm ** 2)));
+
+      return b * A2 * (σ - Δσ); // distance in km
+    }
+
+    function showLoginError(msg) {
+      const el = document.getElementById('loginError');
+      el.textContent = '⚠ ' + msg;
+      el.style.display = 'block';
+    }
+
+    // ── Restore session ──────────────────────────
+    const saved = sessionStorage.getItem('trackerSession');
+    if (saved) {
+      try {
+        routeSession = JSON.parse(saved);
+        launchMap();
+        socket.emit('tracker:join', { routeId: routeSession.routeId });
+      } catch(e) { sessionStorage.removeItem('trackerSession'); }
+    }
+  </script>
+</body>
+</html>
